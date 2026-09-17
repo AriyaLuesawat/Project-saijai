@@ -1,74 +1,122 @@
-# SaiJai (ใส่ใจ)
+# SaiJai Analytics
 
-An AI-assisted expense tracker that turns Thai bank-slip images into structured transactions and visual spending insights.
-
-SaiJai combines OCR, Thai natural language processing, and a lightweight machine-learning classifier. Users can upload one or more transfer slips, review the extracted bank, amount, recipient, and memo, and explore expenses by category in a responsive dashboard.
+SaiJai is an AI-assisted expense analytics application that turns Thai bank-slip images into structured transactions and visual spending insights. It combines OCR, Thai natural-language processing, lightweight machine learning, and an interactive web dashboard.
 
 ![SaiJai logo](frontend/public/image_74b13d.png)
 
-## Why I built it
+## Overview
 
-Recording expenses by hand is repetitive, especially when the information already exists in bank-transfer slips. SaiJai explores how computer vision and NLP can convert those unstructured images into useful financial records while keeping the interface simple for Thai users.
+Recording expenses manually is repetitive when the required information already exists on transfer slips. SaiJai lets users upload slip images, extracts their key fields, predicts an expense category, and adds the results to a searchable analytics dashboard.
 
-This project demonstrates an end-to-end AI workflow: image preprocessing, OCR, information extraction, Thai-text classification, API design, and data visualization.
+The dashboard includes 100 synthetic transactions from five Thai banks, so its charts, filters, and automatic insights can be explored without uploading real financial documents.
 
-## Features
+> All sample records are synthetic. Their recipients, references, amounts, and transactions do not represent real people or payments.
 
-- Upload and analyze multiple bank-slip images
-- Improve OCR input with grayscale conversion, CLAHE contrast enhancement, denoising, and Otsu thresholding
+## Key features
+
+- Upload JPG, PNG, WebP, and HEIC bank-slip images up to 10 MB
+- Improve OCR input with grayscale conversion, CLAHE, denoising, and Otsu thresholding
+- Read Thai and English text with EasyOCR
 - Extract the bank, transferred amount, recipient, and transaction memo
-- Classify Thai transaction descriptions into nine expense categories
-- Show a confidence score for each predicted category
-- Visualize totals with category, pie, and bar charts
-- Search and filter transaction history
+- Classify expenses into nine categories with keyword rules and machine learning
+- Display a confidence score for each AI classification
+- Analyze total spending, average spending, largest transactions, top categories, and top banks
+- Visualize daily trends, category distribution, and spending by bank
+- Filter analytics by bank and by the latest 30 or 90 days
+- Search transaction history by recipient, memo, bank, or reference
+- Download the sample dataset as CSV
 - Store transaction history locally in the browser
-- Validate file type and size through the backend API
+- Use a responsive interface across desktop, tablet, and mobile devices
+
+## Sample dataset
+
+The included dataset contains 100 records, with 20 transactions from each bank.
+
+| Code | Bank | Records |
+| --- | --- | ---: |
+| KBank | Kasikornbank | 20 |
+| SCB | Siam Commercial Bank | 20 |
+| KTB | Krungthai Bank | 20 |
+| BBL | Bangkok Bank | 20 |
+| BAY | Bank of Ayudhya (Krungsri) | 20 |
+
+Each record contains a date, bank, amount, memo, recipient, category, confidence score, synthetic reference, and sample-data flag.
+
+Dataset files:
+
+- `data/slip_transactions.csv` — source dataset for further analysis
+- `frontend/data/sample-transactions.json` — dataset loaded by the dashboard
+- `frontend/public/data/slip-transactions.csv` — downloadable CSV exposed by the frontend
+
+The data is deterministic and can be regenerated with:
+
+```bash
+python3 data/generate_sample_data.py
+```
 
 ## How it works
 
 ```mermaid
 flowchart LR
     A[Bank-slip image] --> B[OpenCV preprocessing]
-    B --> C[EasyOCR Thai + English]
-    C --> D[Field extraction]
+    B --> C[EasyOCR: Thai and English]
+    C --> D[Bank, amount, recipient, and memo extraction]
     D --> E{Known keyword?}
-    E -- Yes --> F[Rule-based category]
-    E -- No --> G[TF-IDF + Multinomial Naive Bayes]
+    E -- Yes --> F[Rule-based classification]
+    E -- No --> G[TF-IDF and Multinomial Naive Bayes]
     F --> H[FastAPI response]
     G --> H
     H --> I[Next.js dashboard]
-    I --> J[Browser localStorage]
+    I --> J[Charts, filters, and localStorage]
 ```
 
-The classifier uses keyword rules for clear cases and falls back to a TF-IDF and Multinomial Naive Bayes model for other Thai-language memos. The API returns both the category and its confidence score.
+The classifier first checks high-confidence keyword rules. If no rule matches, it falls back to a TF-IDF vectorizer and Multinomial Naive Bayes model. The API returns both the predicted category and its confidence score.
 
-## Technology
+## Technology stack
 
-| Area | Tools |
+| Area | Technologies |
 | --- | --- |
-| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS, Recharts |
-| Backend | Python 3.10, FastAPI, Uvicorn |
-| AI and data | EasyOCR, PyThaiNLP, scikit-learn, NumPy |
-| Image processing | OpenCV |
-| Storage | Browser localStorage |
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4 |
+| Data visualization | Recharts |
+| Backend API | Python 3.10, FastAPI, Uvicorn |
+| OCR | EasyOCR |
+| NLP and machine learning | PyThaiNLP, scikit-learn, TF-IDF, Multinomial Naive Bayes |
+| Image processing | OpenCV, NumPy |
+| Client storage | Browser localStorage |
 
 ## Project structure
 
 ```text
-saijai/
+Project-saijai/
 ├── backend/
-│   ├── main.py              # OCR, extraction, classifier, and API
+│   ├── main.py                      # OCR, extraction, classification, and API
 │   └── requirements.txt
+├── data/
+│   ├── generate_sample_data.py      # Reproducible synthetic-data generator
+│   └── slip_transactions.csv        # 100 sample transactions
 └── frontend/
-    ├── app/page.tsx         # Dashboard, upload, and history interface
-    └── public/              # Static assets
+    ├── app/
+    │   ├── globals.css
+    │   ├── layout.tsx
+    │   └── page.tsx                 # Dashboard, upload, and history interface
+    ├── data/
+    │   └── sample-transactions.json
+    └── public/data/
+        └── slip-transactions.csv
 ```
 
-## Run locally
+## Getting started
 
-### 1. Start the backend
+### 1. Clone the repository
 
-Python 3.10 is recommended. The first OCR request downloads or loads the EasyOCR models and can take longer than later requests.
+```bash
+git clone https://github.com/AriyaLuesawat/Project-saijai.git
+cd Project-saijai
+```
+
+### 2. Start the backend
+
+Python 3.10 is recommended. The first OCR request may take longer while EasyOCR loads or downloads its models.
 
 ```bash
 cd backend
@@ -81,33 +129,49 @@ uvicorn main:app --reload --port 8000
 
 Check the API at `http://localhost:8000/health`. Interactive API documentation is available at `http://localhost:8000/docs`.
 
-### 2. Start the frontend
+### 3. Start the frontend
 
 Open another terminal:
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
-Open `http://localhost:3000` and upload a JPG, PNG, or WebP bank-slip image.
+Open `http://localhost:3000`. The dashboard loads the 100 sample transactions automatically.
 
-The frontend connects to `http://localhost:8000` by default. To use another backend URL, create `frontend/.env.local`:
+The frontend connects to `http://localhost:8000` by default. To use another backend, create `frontend/.env.local`:
 
 ```env
 NEXT_PUBLIC_API_URL=https://your-api.example.com
 ```
 
-## API
+## API reference
 
-### `GET /health`
+### Health check
 
-Returns the service status and API version.
+```http
+GET /health
+```
 
-### `POST /analyze-slip/`
+Example response:
 
-Accepts one bank-slip image as multipart form data under the `file` field. Supported content types are JPEG, PNG, WebP, and HEIC, with a maximum size of 10 MB.
+```json
+{
+  "status": "ok",
+  "version": "2.0.0"
+}
+```
+
+### Analyze a slip
+
+```http
+POST /analyze-slip/
+Content-Type: multipart/form-data
+```
+
+Send one image in a form field named `file`.
 
 Example response:
 
@@ -115,37 +179,51 @@ Example response:
 {
   "status": "success",
   "data": {
-    "bank_name": "KBank (กสิกรไทย)",
+    "bank_name": "KBank (Kasikornbank)",
     "amount": "250.00",
-    "memo": "ค่าอาหาร",
-    "recipient": "ร้านตัวอย่าง",
-    "category": "ค่าอาหาร",
+    "memo": "Lunch",
+    "recipient": "Sample Restaurant",
+    "category": "Food",
     "confidence": 1.0
   }
 }
 ```
 
+## Quality checks
+
+```bash
+cd frontend
+npm run lint
+npx tsc --noEmit
+npm run build
+```
+
 ## Current limitations
 
-- Classification is trained from a small in-code vocabulary and has not yet been evaluated on a labeled public dataset.
+- The category classifier uses a small in-code vocabulary and has not yet been evaluated on a public labeled dataset.
 - Amount extraction selects the largest value with two decimal places, which may be incorrect for some slip layouts.
-- Transaction history is stored only in the current browser and is cleared with browser data.
-- OCR runs on CPU and response time depends on image size and hardware.
-- The API currently allows all CORS origins and should be restricted before production deployment.
+- Transaction history is stored only in the current browser and is removed when site data is cleared.
+- OCR runs on the CPU, so response time depends on image size and system performance.
+- The API currently permits all CORS origins and should be restricted before production deployment.
 
 ## Roadmap
 
-- Add anonymized, labeled tests for OCR and category accuracy
-- Move training examples into a versioned dataset
 - Add a database and user authentication
-- Mask sensitive data before storing or logging results
-- Package frontend and backend for reproducible deployment
-- Add automated tests and continuous integration
+- Add anonymized OCR fixtures and automated extraction tests
+- Evaluate classification precision, recall, and F1 score
+- Mask sensitive information before storage or logging
+- Add automated CI/CD workflows
+- Add monthly reports and budget tracking
 
 ## Author
 
 **Ariya Luesawat**<br>
-Artificial Intelligence and System Engineering student at Prince of Songkla University, Phuket Campus
+Artificial Intelligence and System Engineering student<br>
+Prince of Songkla University, Phuket Campus
 
 - [GitHub](https://github.com/AriyaLuesawat)
 - [LinkedIn](https://linkedin.com/in/ariya-luesawat-bb6280419)
+
+## License
+
+This project was created for educational work and experimentation with OCR, NLP, machine learning, and data visualization.
