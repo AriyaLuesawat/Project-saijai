@@ -17,6 +17,8 @@ import {
   RiMailLine,
   RiRefreshLine,
   RiSearchLine,
+  RiMoonLine,
+  RiSunLine,
   RiUploadCloud2Line,
 } from "@remixicon/react";
 import sampleData from "@/data/sample-transactions.json";
@@ -48,6 +50,7 @@ const REPO_URL = "https://github.com/AriyaLuesawat/Project-saijai";
 const SAMPLE_TRANSACTIONS = sampleData as Transaction[];
 const ALL = "ทั้งหมด";
 const DAY = 86_400_000;
+const THEME_KEY = "saijai_theme";
 
 const BANK_NAMES: Record<string, string> = {
   KBank: "กสิกรไทย",
@@ -138,10 +141,10 @@ function change(current: number, previous: number | null): number | null {
 // ─── small Tremor-style components ──────────────────────────────────────────
 type BadgeVariant = "neutral" | "success" | "error" | "warning";
 const BADGE: Record<BadgeVariant, string> = {
-  neutral: "bg-gray-50 text-gray-700 ring-gray-500/30",
-  success: "bg-emerald-50 text-emerald-800 ring-emerald-600/30",
-  error: "bg-red-50 text-red-800 ring-red-600/20",
-  warning: "bg-yellow-50 text-yellow-800 ring-yellow-600/30",
+  neutral: "bg-gray-50 text-gray-700 ring-gray-500/30 dark:bg-gray-400/10 dark:text-gray-300 dark:ring-gray-400/20",
+  success: "bg-emerald-50 text-emerald-800 ring-emerald-600/30 dark:bg-emerald-400/10 dark:text-emerald-400 dark:ring-emerald-400/20",
+  error: "bg-red-50 text-red-800 ring-red-600/20 dark:bg-red-400/10 dark:text-red-400 dark:ring-red-400/20",
+  warning: "bg-yellow-50 text-yellow-800 ring-yellow-600/30 dark:bg-yellow-400/10 dark:text-yellow-500 dark:ring-yellow-400/20",
 };
 
 function Badge({ variant = "neutral", children }: { variant?: BadgeVariant; children: React.ReactNode }) {
@@ -155,7 +158,7 @@ function ChangeBadge({ value }: { value: number | null }) {
   return <Badge variant={variant}>{percent(value, true)}</Badge>;
 }
 
-function ProgressBar({ value, max = 100, color = "bg-emerald-600", track = "bg-emerald-100" }: { value: number; max?: number; color?: string; track?: string }) {
+function ProgressBar({ value, max = 100, color = "bg-emerald-600 dark:bg-emerald-500", track = "bg-emerald-100 dark:bg-emerald-500/30" }: { value: number; max?: number; color?: string; track?: string }) {
   const width = max ? Math.min(100, Math.max(0, (value / max) * 100)) : 0;
   return (
     <div className={cx("relative mt-2 flex h-1.5 w-full items-center rounded-full", track)} role="progressbar" aria-valuenow={Math.round(width)} aria-valuemin={0} aria-valuemax={100}>
@@ -165,26 +168,26 @@ function ProgressBar({ value, max = 100, color = "bg-emerald-600", track = "bg-e
 }
 
 function SectionTitle({ id, children, className }: { id: string; children: React.ReactNode; className?: string }) {
-  return <h1 id={id} className={cx("scroll-mt-10 text-lg font-semibold text-gray-900 sm:text-xl", className)}>{children}</h1>;
+  return <h1 id={id} className={cx("scroll-mt-10 text-lg font-semibold text-gray-900 dark:text-gray-50 sm:text-xl", className)}>{children}</h1>;
 }
 
 function Callout({ children }: { children: React.ReactNode }) {
   return (
-    <div role="status" className="flex gap-2.5 rounded-md bg-yellow-50 px-4 py-3 text-sm text-yellow-900 ring-1 ring-yellow-600/20">
-      <RiInformationLine className="mt-0.5 size-4 shrink-0 text-yellow-700" aria-hidden />
+    <div role="status" className="flex gap-2.5 rounded-md bg-yellow-50 px-4 py-3 text-sm text-yellow-900 ring-1 ring-yellow-600/20 dark:bg-yellow-400/10 dark:text-yellow-200 dark:ring-yellow-400/20">
+      <RiInformationLine className="mt-0.5 size-4 shrink-0 text-yellow-700 dark:text-yellow-400" aria-hidden />
       <p>{children}</p>
     </div>
   );
 }
 
-const inputClass = cx("rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-sm placeholder:text-gray-400", "focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none");
+const inputClass = cx("rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 px-2.5 py-1.5 text-sm text-gray-900 dark:text-gray-50 shadow-sm placeholder:text-gray-400 dark:placeholder:text-gray-500", "focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 dark:focus:ring-emerald-500/30 outline-none");
 
 function Toast({ message, onClose }: { message: string; onClose: () => void }) {
   useEffect(() => {
     const id = window.setTimeout(onClose, 4000);
     return () => window.clearTimeout(id);
   }, [onClose]);
-  return <div role="alert" className="fixed bottom-5 left-1/2 z-[60] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-md bg-gray-900 px-4 py-3 text-sm text-white shadow-lg">{message}</div>;
+  return <div role="alert" className="fixed bottom-5 left-1/2 z-[60] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-md bg-gray-900 px-4 py-3 text-sm text-white shadow-lg ring-1 ring-white/10">{message}</div>;
 }
 
 function TransactionTable({ rows, showConfidence = false }: { rows: Transaction[]; showConfidence?: boolean }) {
@@ -192,26 +195,26 @@ function TransactionTable({ rows, showConfidence = false }: { rows: Transaction[
     <div className="overflow-x-auto">
       <table className="w-full min-w-[36rem] text-sm">
         <thead>
-          <tr className="border-b border-gray-200 text-left">
-            <th className="whitespace-nowrap py-3.5 pr-3 font-semibold text-gray-900">วันที่</th>
-            <th className="px-3 py-3.5 font-semibold text-gray-900">รายการ</th>
-            <th className="hidden px-3 py-3.5 font-semibold text-gray-900 md:table-cell">ผู้รับ</th>
-            <th className="px-3 py-3.5 font-semibold text-gray-900">ธนาคาร</th>
-            <th className="px-3 py-3.5 font-semibold text-gray-900">หมวด</th>
-            {showConfidence && <th className="hidden px-3 py-3.5 text-right font-semibold text-gray-900 lg:table-cell">ความมั่นใจ</th>}
-            <th className="py-3.5 pl-3 text-right font-semibold text-gray-900">จำนวนเงิน</th>
+          <tr className="border-b border-gray-200 dark:border-gray-800 text-left">
+            <th className="whitespace-nowrap py-3.5 pr-3 font-semibold text-gray-900 dark:text-gray-50">วันที่</th>
+            <th className="px-3 py-3.5 font-semibold text-gray-900 dark:text-gray-50">รายการ</th>
+            <th className="hidden px-3 py-3.5 font-semibold text-gray-900 dark:text-gray-50 md:table-cell">ผู้รับ</th>
+            <th className="px-3 py-3.5 font-semibold text-gray-900 dark:text-gray-50">ธนาคาร</th>
+            <th className="px-3 py-3.5 font-semibold text-gray-900 dark:text-gray-50">หมวด</th>
+            {showConfidence && <th className="hidden px-3 py-3.5 text-right font-semibold text-gray-900 dark:text-gray-50 lg:table-cell">ความมั่นใจ</th>}
+            <th className="py-3.5 pl-3 text-right font-semibold text-gray-900 dark:text-gray-50">จำนวนเงิน</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-200">
+        <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
           {rows.map((t) => (
-            <tr key={t.id} className="hover:bg-gray-50">
-              <td className="whitespace-nowrap py-3 pr-3 text-gray-600">{thaiDate(t.date)}</td>
-              <td className="px-3 py-3 text-gray-900">{t.memo}</td>
-              <td className="hidden px-3 py-3 text-gray-600 md:table-cell">{t.recipient}</td>
-              <td className="whitespace-nowrap px-3 py-3 text-gray-600">{BANK_NAMES[bankCode(t)] ?? bankCode(t)}</td>
+            <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-900">
+              <td className="whitespace-nowrap py-3 pr-3 text-gray-600 dark:text-gray-400">{thaiDate(t.date)}</td>
+              <td className="px-3 py-3 text-gray-900 dark:text-gray-50">{t.memo}</td>
+              <td className="hidden px-3 py-3 text-gray-600 dark:text-gray-400 md:table-cell">{t.recipient}</td>
+              <td className="whitespace-nowrap px-3 py-3 text-gray-600 dark:text-gray-400">{BANK_NAMES[bankCode(t)] ?? bankCode(t)}</td>
               <td className="px-3 py-3"><Badge>{t.category}</Badge></td>
-              {showConfidence && <td className="hidden px-3 py-3 text-right text-gray-600 lg:table-cell">{Math.round(t.confidence * 100)}%</td>}
-              <td className="whitespace-nowrap py-3 pl-3 text-right font-medium text-gray-900">{baht(amountOf(t), 2)}</td>
+              {showConfidence && <td className="hidden px-3 py-3 text-right text-gray-600 dark:text-gray-400 lg:table-cell">{Math.round(t.confidence * 100)}%</td>}
+              <td className="whitespace-nowrap py-3 pl-3 text-right font-medium text-gray-900 dark:text-gray-50">{baht(amountOf(t), 2)}</td>
             </tr>
           ))}
         </tbody>
@@ -233,6 +236,26 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [dark, setDark] = useState(false);
+
+  // The inline script in layout.tsx sets the class before paint; read it back here.
+  useEffect(() => {
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    setDark(document.documentElement.classList.contains("dark"));
+  }, []);
+
+  const toggleTheme = () => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    document.documentElement.style.colorScheme = next ? "dark" : "light";
+    try { localStorage.setItem(THEME_KEY, next ? "dark" : "light"); } catch { /* storage may be blocked */ }
+  };
+  const chart = dark
+    ? { grid: "#1f2937", tick: "#9ca3af", previous: "#4b5563", value: "#10b981", tooltipBg: "#030712", tooltipBorder: "#1f2937", tooltipText: "#f9fafb" }
+    : { grid: "#e5e7eb", tick: "#6b7280", previous: "#9ca3af", value: "#059669", tooltipBg: "#ffffff", tooltipBorder: "#e5e7eb", tooltipText: "#111827" };
+  const ThemeIcon = dark ? RiSunLine : RiMoonLine;
+  const themeLabel = dark ? "โหมดสว่าง" : "โหมดมืด";
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -375,7 +398,7 @@ export default function Home() {
   };
 
   const navItem = (active: boolean) =>
-    cx(active ? "text-emerald-700" : "text-gray-700 hover:text-gray-900", "flex w-full items-center gap-x-2.5 rounded-md px-2 py-1.5 text-left text-sm font-medium transition hover:bg-gray-100", focusRing);
+    cx(active ? "text-emerald-700 dark:text-emerald-400" : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-50", "flex w-full items-center gap-x-2.5 rounded-md px-2 py-1.5 text-left text-sm font-medium transition hover:bg-gray-100 dark:hover:bg-gray-900", focusRing);
 
   const shortcuts = [
     { label: "คืนข้อมูลตัวอย่าง", icon: RiRefreshLine, onClick: restoreSamples },
@@ -388,19 +411,19 @@ export default function Home() {
   const compareLabel = range?.compare ? `${thaiDate(range.prevStart)} – ${thaiDate(range.prevEnd)}` : null;
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-50">
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
 
       {/* sidebar (lg+) */}
       <nav className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col" aria-label="เมนูหลัก">
-        <aside className="flex grow flex-col gap-y-6 overflow-y-auto border-r border-gray-200 bg-white p-4">
-          <div className="flex w-full items-center gap-x-2.5 rounded-md border border-gray-300 bg-white p-2 text-sm shadow-sm">
-            <span className="flex aspect-square size-8 shrink-0 items-center justify-center overflow-hidden rounded bg-white p-0.5 ring-1 ring-gray-200">
+        <aside className="flex grow flex-col gap-y-6 overflow-y-auto border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 p-4">
+          <div className="flex w-full items-center gap-x-2.5 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 p-2 text-sm shadow-sm">
+            <span className="flex aspect-square size-8 shrink-0 items-center justify-center overflow-hidden rounded bg-white p-0.5 ring-1 ring-gray-200 dark:ring-gray-700">
               <Image src="/image_74b13d.png" alt="" width={64} height={35} className="h-auto w-full" priority />
             </span>
             <span className="min-w-0">
-              <span className="block truncate font-semibold text-gray-900">SaiJai Analytics</span>
-              <span className="block truncate text-xs text-gray-700">ข้อมูลตัวอย่าง · เดโม</span>
+              <span className="block truncate font-semibold text-gray-900 dark:text-gray-50">SaiJai Analytics</span>
+              <span className="block truncate text-xs text-gray-700 dark:text-gray-300">ข้อมูลตัวอย่าง · เดโม</span>
             </span>
           </div>
 
@@ -419,7 +442,7 @@ export default function Home() {
               <span className="text-xs font-medium leading-6 text-gray-500">ทางลัด</span>
               <ul role="list" className="space-y-0.5">
                 {shortcuts.map((s) => {
-                  const cls = cx(s.danger ? "text-red-600 hover:text-red-700" : "text-gray-700 hover:text-gray-900", "flex w-full items-center gap-x-2.5 rounded-md px-2 py-1.5 text-left text-sm font-medium transition hover:bg-gray-100", focusRing);
+                  const cls = cx(s.danger ? "text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300" : "text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-50", "flex w-full items-center gap-x-2.5 rounded-md px-2 py-1.5 text-left text-sm font-medium transition hover:bg-gray-100 dark:hover:bg-gray-900", focusRing);
                   const body = <><s.icon className="size-4 shrink-0" aria-hidden />{s.label}</>;
                   return <li key={s.label}>{s.href ? <a href={s.href} download={s.download || undefined} className={cls}>{body}</a> : <button onClick={s.onClick} className={cls}>{body}</button>}</li>;
                 })}
@@ -427,25 +450,32 @@ export default function Home() {
             </div>
           </div>
 
-          <a href={DEVELOPER_CONTACT} className={cx("mt-auto flex items-center gap-x-2.5 rounded-md p-2 text-sm font-medium text-gray-900 hover:bg-gray-100", focusRing)}>
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700"><RiMailLine className="size-4" aria-hidden /></span>
+          <button onClick={toggleTheme} className={cx("mt-auto flex w-full items-center gap-x-2.5 rounded-md px-2 py-1.5 text-left text-sm font-medium text-gray-700 transition hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-900 dark:hover:text-gray-50", focusRing)}>
+            <ThemeIcon className="size-4 shrink-0" aria-hidden />
+            {themeLabel}
+          </button>
+          <a href={DEVELOPER_CONTACT} className={cx("-mt-4 flex items-center gap-x-2.5 rounded-md p-2 text-sm font-medium text-gray-900 dark:text-gray-50 hover:bg-gray-100 dark:hover:bg-gray-900", focusRing)}>
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-700 dark:text-gray-300"><RiMailLine className="size-4" aria-hidden /></span>
             <span><span className="block">ติดต่อผู้พัฒนา</span><span className="block text-xs font-normal text-gray-500">สอบถามหรือขอทดลองระบบจริง</span></span>
           </a>
         </aside>
       </nav>
 
       {/* top bar (below lg) */}
-      <div className="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm lg:hidden">
+      <div className="sticky top-0 z-40 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 shadow-sm lg:hidden">
         <div className="flex h-14 items-center justify-between px-4">
           <div className="flex items-center gap-2.5">
-            <Image src="/image_74b13d.png" alt="" width={52} height={28} className="h-7 w-auto" priority />
+            <span className="rounded bg-white px-1 py-0.5"><Image src="/image_74b13d.png" alt="" width={52} height={28} className="h-6 w-auto" priority /></span>
             <span className="text-sm font-semibold">SaiJai Analytics</span>
           </div>
-          <a href={DEVELOPER_CONTACT} className="text-sm font-medium text-emerald-700">ติดต่อผู้พัฒนา</a>
+          <div className="flex items-center gap-3">
+            <button onClick={toggleTheme} aria-label={themeLabel} title={themeLabel} className={cx("rounded-md p-1.5 text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-900", focusRing)}><ThemeIcon className="size-5" aria-hidden /></button>
+            <a href={DEVELOPER_CONTACT} className="text-sm font-medium text-emerald-700 dark:text-emerald-400">ติดต่อผู้พัฒนา</a>
+          </div>
         </div>
         <div className="-mb-px flex gap-5 overflow-x-auto px-4 text-sm">
           {NAVIGATION.map((item) => (
-            <button key={item.id} onClick={() => setMenu(item.id)} className={cx("whitespace-nowrap border-b-2 pb-2.5 pt-1 font-medium", menu === item.id ? "border-emerald-600 text-emerald-700" : "border-transparent text-gray-600")}>{item.label}</button>
+            <button key={item.id} onClick={() => setMenu(item.id)} className={cx("whitespace-nowrap border-b-2 pb-2.5 pt-1 font-medium", menu === item.id ? "border-emerald-600 dark:border-emerald-500 text-emerald-700 dark:text-emerald-400" : "border-transparent text-gray-600 dark:text-gray-400")}>{item.label}</button>
           ))}
         </div>
       </div>
@@ -471,41 +501,41 @@ export default function Home() {
                   <div className="flex flex-col justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <dt className="font-bold text-gray-900 sm:text-sm">หมวดค่าใช้จ่าย</dt>
+                        <dt className="font-bold text-gray-900 dark:text-gray-50 sm:text-sm">หมวดค่าใช้จ่าย</dt>
                         {topCategory && <ChangeBadge value={change(topCategory.value, prevCategories.has(topCategory.name) ? prevCategories.get(topCategory.name)! : range?.compare ? 0 : null)} />}
                       </div>
                       <dd className="mt-2 flex items-baseline gap-2">
-                        <span className="text-xl text-gray-900">{topCategory && total ? percent(topCategory.value / total) : "—"}</span>
+                        <span className="text-xl text-gray-900 dark:text-gray-50">{topCategory && total ? percent(topCategory.value / total) : "—"}</span>
                         <span className="text-sm text-gray-500">{topCategory ? `ของยอดรวมเป็น${topCategory.name}` : "ยังไม่มีข้อมูล"}</span>
                       </dd>
                       <ul role="list" className="mt-4 space-y-5">
                         {categories.slice(0, 3).map((c) => (
                           <li key={c.name}>
-                            <p className="flex justify-between text-sm"><span className="font-medium text-gray-900">{c.name}</span><span className="font-medium text-gray-900">{baht(c.value)}<span className="font-normal text-gray-500"> / {baht(total)}</span></span></p>
+                            <p className="flex justify-between text-sm"><span className="font-medium text-gray-900 dark:text-gray-50">{c.name}</span><span className="font-medium text-gray-900 dark:text-gray-50">{baht(c.value)}<span className="font-normal text-gray-500"> / {baht(total)}</span></span></p>
                             <ProgressBar value={c.value} max={total} />
                           </li>
                         ))}
                       </ul>
                     </div>
-                    <p className="mt-6 text-xs text-gray-500">ดูรายการแยกตามหมวดได้ใน <button onClick={() => setMenu("history")} className="text-emerald-700 hover:underline">หน้ารายการ</button></p>
+                    <p className="mt-6 text-xs text-gray-500">ดูรายการแยกตามหมวดได้ใน <button onClick={() => setMenu("history")} className="text-emerald-700 dark:text-emerald-400 hover:underline">หน้ารายการ</button></p>
                   </div>
 
                   {/* banks */}
                   <div className="flex flex-col justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <dt className="font-bold text-gray-900 sm:text-sm">ธนาคาร</dt>
+                        <dt className="font-bold text-gray-900 dark:text-gray-50 sm:text-sm">ธนาคาร</dt>
                         {topBank && <ChangeBadge value={change(topBank.value, prevBankTotals.has(topBank.name) ? prevBankTotals.get(topBank.name)! : range?.compare ? 0 : null)} />}
                       </div>
                       <dd className="mt-2 flex items-baseline gap-2">
-                        <span className="text-xl text-gray-900">{topBank ? BANK_NAMES[topBank.name] ?? topBank.name : "—"}</span>
+                        <span className="text-xl text-gray-900 dark:text-gray-50">{topBank ? BANK_NAMES[topBank.name] ?? topBank.name : "—"}</span>
                         <span className="text-sm text-gray-500">{topBank ? `ยอดสูงสุด ${topBank.count} รายการ` : ""}</span>
                       </dd>
                       <ul role="list" className="mt-4 space-y-5">
                         {bankTotals.slice(0, 3).map((b) => (
                           <li key={b.name}>
-                            <p className="flex justify-between text-sm"><span className="font-medium text-gray-900">{BANK_NAMES[b.name] ?? b.name}</span><span className="font-medium text-gray-900">{baht(b.value)}<span className="font-normal text-gray-500"> · {b.count} รายการ</span></span></p>
-                            <ProgressBar value={b.value} max={total} color="bg-gray-500" track="bg-gray-200" />
+                            <p className="flex justify-between text-sm"><span className="font-medium text-gray-900 dark:text-gray-50">{BANK_NAMES[b.name] ?? b.name}</span><span className="font-medium text-gray-900 dark:text-gray-50">{baht(b.value)}<span className="font-normal text-gray-500"> · {b.count} รายการ</span></span></p>
+                            <ProgressBar value={b.value} max={total} color="bg-gray-500" track="bg-gray-200 dark:bg-gray-500/40" />
                           </li>
                         ))}
                       </ul>
@@ -517,15 +547,15 @@ export default function Home() {
                   <div className="flex flex-col justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-gray-900 sm:text-sm">ยอดใช้จ่าย</h3>
+                        <h3 className="font-bold text-gray-900 dark:text-gray-50 sm:text-sm">ยอดใช้จ่าย</h3>
                         <ChangeBadge value={change(total, prevTotal)} />
                       </div>
                       <p className="mt-2 flex items-baseline gap-2">
-                        <span className="text-xl text-gray-900">{baht(total)}</span>
+                        <span className="text-xl text-gray-900 dark:text-gray-50">{baht(total)}</span>
                         <span className="text-sm text-gray-500">{current.length} รายการในช่วงที่เลือก</span>
                       </p>
                       <div className="mt-4">
-                        <p className="text-sm font-medium text-gray-900">สัดส่วนตามหมวด</p>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-50">สัดส่วนตามหมวด</p>
                         <div className="mt-2 flex items-center gap-0.5">
                           {stack.map((s, i) => <div key={s.name} className={cx(STACK_COLORS[i], "h-1.5 rounded-full")} style={{ width: `${total ? (s.value / total) * 100 : 0}%` }} />)}
                         </div>
@@ -534,8 +564,8 @@ export default function Home() {
                         {stack.map((s, i) => (
                           <li key={s.name} className="flex items-center gap-2 text-xs">
                             <span className={cx(STACK_COLORS[i], "size-2.5 rounded-sm")} aria-hidden />
-                            <span className="text-gray-900">{s.name}</span>
-                            <span className="text-gray-600">({baht(s.value)} / {total ? percent(s.value / total) : "0%"})</span>
+                            <span className="text-gray-900 dark:text-gray-50">{s.name}</span>
+                            <span className="text-gray-600 dark:text-gray-400">({baht(s.value)} / {total ? percent(s.value / total) : "0%"})</span>
                           </li>
                         ))}
                       </ul>
@@ -547,17 +577,17 @@ export default function Home() {
 
               <section aria-labelledby="daily">
                 <SectionTitle id="daily" className="mt-16">รายวัน</SectionTitle>
-                <div className="sticky top-[5.75rem] z-20 flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white pb-4 pt-4 sm:pt-6 lg:top-0 lg:pt-8">
-                  <div className="flex overflow-hidden rounded-md border border-gray-300 shadow-sm">
+                <div className="sticky top-[5.75rem] z-20 flex flex-wrap items-center gap-2 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 pb-4 pt-4 sm:pt-6 lg:top-0 lg:pt-8">
+                  <div className="flex overflow-hidden rounded-md border border-gray-300 dark:border-gray-700 shadow-sm">
                     {PERIODS.map((p) => (
-                      <button key={p.id} onClick={() => setPeriod(p.id)} className={cx("px-3 py-1.5 text-sm font-medium [&:not(:first-child)]:border-l [&:not(:first-child)]:border-gray-300", period === p.id ? "bg-gray-100 text-gray-900" : "bg-white text-gray-600 hover:bg-gray-50", focusRing)}>{p.label}</button>
+                      <button key={p.id} onClick={() => setPeriod(p.id)} className={cx("px-3 py-1.5 text-sm font-medium [&:not(:first-child)]:border-l [&:not(:first-child)]:border-gray-300 dark:[&:not(:first-child)]:border-gray-700", period === p.id ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-50" : "bg-white dark:bg-gray-950 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900", focusRing)}>{p.label}</button>
                     ))}
                   </div>
                   <select aria-label="ธนาคาร" value={bankFilter} onChange={(e) => setBankFilter(e.target.value)} className={inputClass}>
                     <option value={ALL}>ทุกธนาคาร</option>
                     {banks.map((b) => <option key={b} value={b}>{BANK_NAMES[b] ?? b}</option>)}
                   </select>
-                  <span className="text-sm text-gray-500">{compareLabel ? <>เทียบกับ <span className="font-medium text-gray-700">ช่วงก่อนหน้า</span></> : "ไม่เทียบช่วงก่อนหน้า"}</span>
+                  <span className="text-sm text-gray-500">{compareLabel ? <>เทียบกับ <span className="font-medium text-gray-700 dark:text-gray-300">ช่วงก่อนหน้า</span></> : "ไม่เทียบช่วงก่อนหน้า"}</span>
                 </div>
                 <dl className="mt-10 grid grid-cols-1 gap-14 md:grid-cols-2 xl:grid-cols-3">
                   {series.map((m) => {
@@ -565,22 +595,22 @@ export default function Home() {
                     return (
                       <div key={m.title}>
                         <div className="flex items-center gap-x-2">
-                          <dt className="font-bold text-gray-900 sm:text-sm">{m.title}</dt>
+                          <dt className="font-bold text-gray-900 dark:text-gray-50 sm:text-sm">{m.title}</dt>
                           <ChangeBadge value={m.change} />
                         </div>
                         <div className="mt-2 flex items-baseline justify-between">
-                          <dd className="text-xl text-gray-900">{fmt(m.value)}</dd>
+                          <dd className="text-xl text-gray-900 dark:text-gray-50">{fmt(m.value)}</dd>
                           {m.prevValue !== null && <dd className="text-sm text-gray-500">จาก {fmt(m.prevValue)}</dd>}
                         </div>
                         <div className="mt-6 h-32">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={m.data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
-                              <CartesianGrid vertical={false} stroke="#e5e7eb" strokeDasharray="0" />
-                              <XAxis dataKey="label" ticks={m.data.length ? [m.data[0].label, m.data[m.data.length - 1].label] : []} interval="preserveStartEnd" tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
+                              <CartesianGrid vertical={false} stroke={chart.grid} strokeDasharray="0" />
+                              <XAxis dataKey="label" ticks={m.data.length ? [m.data[0].label, m.data[m.data.length - 1].label] : []} interval="preserveStartEnd" tick={{ fontSize: 12, fill: chart.tick }} axisLine={false} tickLine={false} />
                               <YAxis hide domain={["auto", "auto"]} />
-                              <Tooltip formatter={(v, name) => [fmt(Number(v)), name === "previous" ? "ช่วงก่อนหน้า" : "ช่วงนี้"]} contentStyle={{ borderRadius: 6, border: "1px solid #e5e7eb", boxShadow: "0 1px 2px rgb(0 0 0 / .05)", fontSize: 13 }} />
-                              {range?.compare && <Line dataKey="previous" stroke="#9ca3af" strokeWidth={2} dot={false} isAnimationActive={false} />}
-                              <Line dataKey="value" stroke="#059669" strokeWidth={2} dot={false} isAnimationActive={false} />
+                              <Tooltip formatter={(v, name) => [fmt(Number(v)), name === "previous" ? "ช่วงก่อนหน้า" : "ช่วงนี้"]} contentStyle={{ borderRadius: 6, border: `1px solid ${chart.tooltipBorder}`, background: chart.tooltipBg, color: chart.tooltipText, boxShadow: "0 1px 2px rgb(0 0 0 / .05)", fontSize: 13 }} labelStyle={{ color: chart.tooltipText }} itemStyle={{ color: chart.tooltipText }} />
+                              {range?.compare && <Line dataKey="previous" stroke={chart.previous} strokeWidth={2} dot={false} isAnimationActive={false} />}
+                              <Line dataKey="value" stroke={chart.value} strokeWidth={2} dot={false} isAnimationActive={false} />
                             </LineChart>
                           </ResponsiveContainer>
                         </div>
@@ -593,7 +623,7 @@ export default function Home() {
               <section aria-labelledby="latest">
                 <div className="mt-16 flex items-baseline justify-between">
                   <SectionTitle id="latest">รายการล่าสุด</SectionTitle>
-                  <button onClick={() => setMenu("history")} className="text-sm font-medium text-emerald-700 hover:underline">ดูทั้งหมด</button>
+                  <button onClick={() => setMenu("history")} className="text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline">ดูทั้งหมด</button>
                 </div>
                 <div className="mt-4">{current.length ? <TransactionTable rows={current.slice(0, 8)} /> : <p className="py-10 text-center text-sm text-gray-500">ไม่มีรายการในช่วงที่เลือก</p>}</div>
               </section>
@@ -628,21 +658,21 @@ export default function Home() {
                 onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
                 onDragLeave={() => setDragging(false)}
                 onDrop={(e) => { e.preventDefault(); setDragging(false); handleFiles([...e.dataTransfer.files]); }}
-                className={cx("mt-6 flex w-full flex-col items-center rounded-md border border-dashed px-6 py-12 text-center transition", dragging ? "border-emerald-500 bg-emerald-50" : "border-gray-300 hover:border-gray-400", focusRing)}
+                className={cx("mt-6 flex w-full flex-col items-center rounded-md border border-dashed px-6 py-12 text-center transition", dragging ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-400/10" : "border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600", focusRing)}
               >
                 <input ref={fileInput} type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleFiles([...(e.target.files ?? [])])} />
                 <RiUploadCloud2Line className="size-8 text-gray-400" aria-hidden />
-                <p className="mt-3 text-sm font-medium text-gray-900">คลิกเพื่อเลือกไฟล์ <span className="font-normal text-gray-500">หรือลากสลิปมาวาง</span></p>
+                <p className="mt-3 text-sm font-medium text-gray-900 dark:text-gray-50">คลิกเพื่อเลือกไฟล์ <span className="font-normal text-gray-500">หรือลากสลิปมาวาง</span></p>
                 <p className="mt-1 text-xs text-gray-500">JPG, PNG หรือ WebP ไม่เกิน 10 MB ต่อไฟล์</p>
               </button>
               {!!previews.length && (
                 <ul className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
                   {previews.map((p) => (
-                    <li key={p.url} className="overflow-hidden rounded-md border border-gray-200">
+                    <li key={p.url} className="overflow-hidden rounded-md border border-gray-200 dark:border-gray-800">
                       {/* User-selected object URLs cannot be optimized by next/image. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={p.url} alt={p.name} className="aspect-square w-full object-cover" />
-                      <p className="truncate px-2 py-1 text-xs text-gray-600">{p.name}</p>
+                      <p className="truncate px-2 py-1 text-xs text-gray-600 dark:text-gray-400">{p.name}</p>
                     </li>
                   ))}
                 </ul>
