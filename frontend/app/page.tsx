@@ -1,21 +1,24 @@
 "use client";
 
+// Layout and component styling adapted from Tremor's open-source dashboard
+// template (https://github.com/tremorlabs/template-dashboard-oss, Apache-2.0).
+// See THIRD_PARTY_NOTICES.md.
+
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+  RiDeleteBin6Line,
+  RiDownload2Line,
+  RiGithubLine,
+  RiHome2Line,
+  RiInformationLine,
+  RiListCheck,
+  RiMailLine,
+  RiRefreshLine,
+  RiSearchLine,
+  RiUploadCloud2Line,
+} from "@remixicon/react";
 import sampleData from "@/data/sample-transactions.json";
 
 interface Transaction {
@@ -33,144 +36,198 @@ interface Transaction {
   is_sample?: boolean;
 }
 
-type Menu = "dashboard" | "upload" | "history";
-type Period = "30" | "90" | "all";
+type Menu = "dashboard" | "history" | "upload";
+type Period = "7" | "30" | "45" | "all";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const DB_KEY = "saijai_database_v2";
 // The slip-analysis backend is not deployed. Set NEXT_PUBLIC_DEMO_MODE=false once it is.
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE !== "false";
 const DEVELOPER_CONTACT = "mailto:ariya06120@gmail.com?subject=SaiJai%20Analytics";
+const REPO_URL = "https://github.com/AriyaLuesawat/Project-saijai";
 const SAMPLE_TRANSACTIONS = sampleData as Transaction[];
+const ALL = "ทั้งหมด";
+const DAY = 86_400_000;
 
-const CATEGORY_COLORS: Record<string, string> = {
-  "ค่าอาหาร": "#10b981",
-  "ค่าเดินทาง": "#f59e0b",
-  "ค่าสาธารณูปโภค": "#3b82f6",
-  "ค่าของใช้": "#f43f5e",
-  "โอนเงิน": "#8b5cf6",
-  "ทำบุญ/บริจาค": "#06b6d4",
-  "ความบันเทิง": "#ec4899",
-  "สุขภาพ/ความงาม": "#84cc16",
-  "อื่นๆ": "#64748b",
+const BANK_NAMES: Record<string, string> = {
+  KBank: "กสิกรไทย",
+  SCB: "ไทยพาณิชย์",
+  KTB: "กรุงไทย",
+  BBL: "กรุงเทพ",
+  BAY: "กรุงศรีอยุธยา",
 };
 
-const BANK_COLORS: Record<string, string> = {
-  KBank: "#159c62",
-  SCB: "#6f2c91",
-  KTB: "#11a8e2",
-  BBL: "#1e3a8a",
-  BAY: "#f4c430",
-};
+const CATEGORIES = ["ค่าอาหาร", "ค่าเดินทาง", "ค่าสาธารณูปโภค", "ค่าของใช้", "โอนเงิน", "ทำบุญ/บริจาค", "ความบันเทิง", "สุขภาพ/ความงาม", "อื่นๆ"];
+const STACK_COLORS = ["bg-emerald-600", "bg-sky-600", "bg-amber-500", "bg-gray-400"];
 
-const NAV_ITEMS: { id: Menu; icon: string; label: string }[] = [
-  { id: "dashboard", icon: "◫", label: "ภาพรวม" },
-  { id: "upload", icon: "↑", label: "อัปโหลดสลิป" },
-  { id: "history", icon: "≡", label: "รายการทั้งหมด" },
+const NAVIGATION: { id: Menu; label: string; icon: typeof RiHome2Line }[] = [
+  { id: "dashboard", label: "ภาพรวม", icon: RiHome2Line },
+  { id: "history", label: "รายการ", icon: RiListCheck },
+  { id: "upload", label: "เพิ่มสลิป", icon: RiUploadCloud2Line },
 ];
 
-const CATEGORIES = Object.keys(CATEGORY_COLORS);
+const PERIODS: { id: Period; label: string }[] = [
+  { id: "7", label: "7 วัน" },
+  { id: "30", label: "30 วัน" },
+  { id: "45", label: "45 วัน" },
+  { id: "all", label: "ทั้งหมด" },
+];
 
-function amountOf(transaction: Transaction): number {
-  return Number.parseFloat(transaction.amount.replace(/,/g, "")) || 0;
+const CHART_METRICS: { title: string; kind: "money" | "count"; category?: string }[] = [
+  { title: "ยอดใช้จ่าย", kind: "money" },
+  { title: "จำนวนรายการ", kind: "count" },
+  { title: "ค่าอาหาร", kind: "money", category: "ค่าอาหาร" },
+  { title: "ค่าเดินทาง", kind: "money", category: "ค่าเดินทาง" },
+  { title: "ค่าของใช้", kind: "money", category: "ค่าของใช้" },
+  { title: "โอนเงิน", kind: "money", category: "โอนเงิน" },
+];
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+const cx = (...classes: (string | false | null | undefined)[]) => classes.filter(Boolean).join(" ");
+const focusRing = "outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1";
+
+function amountOf(t: Transaction): number {
+  return Number.parseFloat(t.amount.replace(/,/g, "")) || 0;
 }
 
-function formatMoney(value: number | string, digits = 0): string {
-  const number = typeof value === "string" ? Number.parseFloat(value.replace(/,/g, "")) : value;
-  return (Number.isFinite(number) ? number : 0).toLocaleString("th-TH", {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
+function baht(value: number, digits = 0): string {
+  return `฿${value.toLocaleString("th-TH", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+}
+
+function count(value: number): string {
+  return value.toLocaleString("th-TH");
+}
+
+function percent(value: number, signed = false): string {
+  if (!Number.isFinite(value)) return "—";
+  const text = `${(value * 100).toFixed(1)}%`;
+  return signed && value > 0 ? `+${text}` : text;
+}
+
+const dayStart = (iso: string) => new Date(`${iso.slice(0, 10)}T00:00:00`).getTime();
+const isoDay = (time: number) => {
+  const d = new Date(time);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+function thaiDate(value: string | number, withYear = true): string {
+  const date = new Date(typeof value === "number" ? value : dayStart(value));
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("th-TH", { day: "numeric", month: "short", year: withYear ? "2-digit" : undefined }).format(date);
+}
+
+function bankCode(t: Transaction): string {
+  return t.bank_code ?? t.bank_name.split(" ")[0];
+}
+
+function sumBy(items: Transaction[], key: (t: Transaction) => string) {
+  const map = new Map<string, { value: number; count: number }>();
+  items.forEach((t) => {
+    const k = key(t);
+    const cur = map.get(k) ?? { value: 0, count: 0 };
+    map.set(k, { value: cur.value + amountOf(t), count: cur.count + 1 });
   });
+  return [...map.entries()].map(([name, d]) => ({ name, ...d })).sort((a, b) => b.value - a.value);
 }
 
-function formatDate(value: string, compact = false): string {
-  const date = new Date(`${value.slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("th-TH", {
-    day: "numeric",
-    month: compact ? "short" : "long",
-    year: compact ? undefined : "numeric",
-  }).format(date);
+function change(current: number, previous: number | null): number | null {
+  if (previous === null || previous === 0) return null;
+  return (current - previous) / previous;
 }
 
-function bankCode(transaction: Transaction): string {
-  return transaction.bank_code ?? transaction.bank_name.split(" ")[0];
+// ─── small Tremor-style components ──────────────────────────────────────────
+type BadgeVariant = "neutral" | "success" | "error" | "warning";
+const BADGE: Record<BadgeVariant, string> = {
+  neutral: "bg-gray-50 text-gray-700 ring-gray-500/30",
+  success: "bg-emerald-50 text-emerald-800 ring-emerald-600/30",
+  error: "bg-red-50 text-red-800 ring-red-600/20",
+  warning: "bg-yellow-50 text-yellow-800 ring-yellow-600/30",
+};
+
+function Badge({ variant = "neutral", children }: { variant?: BadgeVariant; children: React.ReactNode }) {
+  return <span className={cx("inline-flex items-center gap-x-1 whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-semibold ring-1", BADGE[variant])}>{children}</span>;
 }
 
-function aggregate(transactions: Transaction[], getKey: (transaction: Transaction) => string) {
-  const values = new Map<string, { value: number; count: number }>();
-  transactions.forEach((transaction) => {
-    const key = getKey(transaction);
-    const current = values.get(key) ?? { value: 0, count: 0 };
-    values.set(key, { value: current.value + amountOf(transaction), count: current.count + 1 });
-  });
-  return [...values.entries()]
-    .map(([name, data]) => ({ name, ...data }))
-    .sort((a, b) => b.value - a.value);
+// For spending, going up is the "bad" direction.
+function ChangeBadge({ value }: { value: number | null }) {
+  if (value === null) return null;
+  const variant: BadgeVariant = value > 0.005 ? "error" : value < -0.005 ? "success" : "neutral";
+  return <Badge variant={variant}>{percent(value, true)}</Badge>;
 }
 
-function Toast({ message, onClose }: { message: string; onClose: () => void }) {
-  useEffect(() => {
-    const timeout = window.setTimeout(onClose, 3500);
-    return () => window.clearTimeout(timeout);
-  }, [onClose]);
-
-  return <div role="alert" className="fixed bottom-5 right-5 z-50 max-w-sm rounded-2xl bg-slate-950 px-5 py-4 text-sm font-semibold text-white shadow-2xl">{message}</div>;
-}
-
-function CategoryBadge({ category }: { category: string }) {
-  const color = CATEGORY_COLORS[category] ?? "#64748b";
-  return <span className="rounded-full border px-2.5 py-1 text-xs font-bold" style={{ color, borderColor: `${color}35`, backgroundColor: `${color}12` }}>{category}</span>;
-}
-
-function TransactionRow({ transaction }: { transaction: Transaction }) {
-  const code = bankCode(transaction);
+function ProgressBar({ value, max = 100, color = "bg-emerald-600", track = "bg-emerald-100" }: { value: number; max?: number; color?: string; track?: string }) {
+  const width = max ? Math.min(100, Math.max(0, (value / max) * 100)) : 0;
   return (
-    <article className="grid grid-cols-[auto_1fr_auto] items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-lg">
-      {transaction.preview ? (
-        // User-selected images use temporary object URLs and cannot use next/image.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={transaction.preview} alt="ภาพสลิป" className="h-12 w-12 rounded-xl object-cover" />
-      ) : (
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl text-xs font-bold text-white" style={{ backgroundColor: BANK_COLORS[code] ?? "#475569" }}>{code}</div>
-      )}
-      <div className="min-w-0">
-        <div className="mb-1 flex flex-wrap items-center gap-2">
-          <CategoryBadge category={transaction.category} />
-          {transaction.is_sample && <span className="text-[11px] font-bold tracking-normal text-slate-300">demo</span>}
-        </div>
-        <p className="truncate text-sm font-semibold text-slate-800">{transaction.memo}</p>
-        <p className="truncate text-xs text-slate-400">{transaction.recipient} · {formatDate(transaction.date, true)}</p>
-      </div>
-      <div className="text-right">
-        <p className="font-bold text-slate-900">฿{formatMoney(transaction.amount, 2)}</p>
-        <p className="mt-1 text-xs font-bold text-slate-400">AI {Math.round(transaction.confidence * 100)}%</p>
-      </div>
-    </article>
-  );
-}
-
-function DemoNotice({ compact = false }: { compact?: boolean }) {
-  if (!DEMO_MODE) return null;
-  return (
-    <div role="status" className={`flex flex-col gap-2 border border-amber-200 bg-amber-50 text-amber-900 sm:flex-row sm:items-center sm:justify-between ${compact ? "rounded-2xl px-4 py-3 text-sm" : "px-5 py-3 text-sm sm:px-8"}`}>
-      <p><span className="font-semibold">เว็บไซต์นี้เป็นเว็บจำลองสำหรับสาธิตเท่านั้น</span> ระบบหลังบ้านสำหรับวิเคราะห์สลิปยังไม่พร้อมใช้งาน ข้อมูลที่แสดงเป็นข้อมูลตัวอย่าง หากต้องการทดลองระบบจริง โปรดติดต่อผู้พัฒนา</p>
-      <a href={DEVELOPER_CONTACT} className="shrink-0 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-center text-xs font-semibold text-amber-900 hover:bg-amber-100">ติดต่อผู้พัฒนา</a>
+    <div className={cx("relative mt-2 flex h-1.5 w-full items-center rounded-full", track)} role="progressbar" aria-valuenow={Math.round(width)} aria-valuemin={0} aria-valuemax={100}>
+      <div className={cx("h-full rounded-full", color)} style={{ width: `${width}%` }} />
     </div>
   );
 }
 
-function EmptyState({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-3xl border-2 border-dashed border-slate-200 bg-white py-16 text-center text-sm font-semibold text-slate-400">{children}</div>;
+function SectionTitle({ id, children, className }: { id: string; children: React.ReactNode; className?: string }) {
+  return <h1 id={id} className={cx("scroll-mt-10 text-lg font-semibold text-gray-900 sm:text-xl", className)}>{children}</h1>;
 }
 
+function Callout({ children }: { children: React.ReactNode }) {
+  return (
+    <div role="status" className="flex gap-2.5 rounded-md bg-yellow-50 px-4 py-3 text-sm text-yellow-900 ring-1 ring-yellow-600/20">
+      <RiInformationLine className="mt-0.5 size-4 shrink-0 text-yellow-700" aria-hidden />
+      <p>{children}</p>
+    </div>
+  );
+}
+
+const inputClass = cx("rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 shadow-sm placeholder:text-gray-400", "focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none");
+
+function Toast({ message, onClose }: { message: string; onClose: () => void }) {
+  useEffect(() => {
+    const id = window.setTimeout(onClose, 4000);
+    return () => window.clearTimeout(id);
+  }, [onClose]);
+  return <div role="alert" className="fixed bottom-5 left-1/2 z-[60] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-md bg-gray-900 px-4 py-3 text-sm text-white shadow-lg">{message}</div>;
+}
+
+function TransactionTable({ rows, showConfidence = false }: { rows: Transaction[]; showConfidence?: boolean }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[36rem] text-sm">
+        <thead>
+          <tr className="border-b border-gray-200 text-left">
+            <th className="whitespace-nowrap py-3.5 pr-3 font-semibold text-gray-900">วันที่</th>
+            <th className="px-3 py-3.5 font-semibold text-gray-900">รายการ</th>
+            <th className="hidden px-3 py-3.5 font-semibold text-gray-900 md:table-cell">ผู้รับ</th>
+            <th className="px-3 py-3.5 font-semibold text-gray-900">ธนาคาร</th>
+            <th className="px-3 py-3.5 font-semibold text-gray-900">หมวด</th>
+            {showConfidence && <th className="hidden px-3 py-3.5 text-right font-semibold text-gray-900 lg:table-cell">ความมั่นใจ</th>}
+            <th className="py-3.5 pl-3 text-right font-semibold text-gray-900">จำนวนเงิน</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {rows.map((t) => (
+            <tr key={t.id} className="hover:bg-gray-50">
+              <td className="whitespace-nowrap py-3 pr-3 text-gray-600">{thaiDate(t.date)}</td>
+              <td className="px-3 py-3 text-gray-900">{t.memo}</td>
+              <td className="hidden px-3 py-3 text-gray-600 md:table-cell">{t.recipient}</td>
+              <td className="whitespace-nowrap px-3 py-3 text-gray-600">{BANK_NAMES[bankCode(t)] ?? bankCode(t)}</td>
+              <td className="px-3 py-3"><Badge>{t.category}</Badge></td>
+              {showConfidence && <td className="hidden px-3 py-3 text-right text-gray-600 lg:table-cell">{Math.round(t.confidence * 100)}%</td>}
+              <td className="whitespace-nowrap py-3 pl-3 text-right font-medium text-gray-900">{baht(amountOf(t), 2)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── page ───────────────────────────────────────────────────────────────────
 export default function Home() {
-  const [activeMenu, setActiveMenu] = useState<Menu>("dashboard");
+  const [menu, setMenu] = useState<Menu>("dashboard");
   const [transactions, setTransactions] = useState<Transaction[]>(SAMPLE_TRANSACTIONS);
-  const [period, setPeriod] = useState<Period>("all");
-  const [bankFilter, setBankFilter] = useState("ทั้งหมด");
-  const [categoryFilter, setCategoryFilter] = useState("ทั้งหมด");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [period, setPeriod] = useState<Period>("30");
+  const [bankFilter, setBankFilter] = useState(ALL);
+  const [categoryFilter, setCategoryFilter] = useState(ALL);
+  const [query, setQuery] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<{ url: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
@@ -186,7 +243,7 @@ export default function Home() {
       if (saved) setTransactions(JSON.parse(saved) as Transaction[]);
       else localStorage.setItem(DB_KEY, JSON.stringify(SAMPLE_TRANSACTIONS));
     } catch {
-      setToast("ไม่สามารถอ่านข้อมูลที่บันทึกไว้ได้ จึงแสดงชุดข้อมูลตัวอย่างแทน");
+      setToast("ไม่สามารถอ่านข้อมูลที่บันทึกไว้ได้ จึงแสดงข้อมูลตัวอย่างแทน");
     }
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
@@ -205,38 +262,77 @@ export default function Home() {
   }, []);
 
   const banks = useMemo(() => [...new Set(transactions.map(bankCode))].sort(), [transactions]);
-  const latestDate = useMemo(() => transactions.reduce((latest, item) => item.date > latest ? item.date : latest, ""), [transactions]);
-  const dashboardTransactions = useMemo(() => {
-    let result = bankFilter === "ทั้งหมด" ? transactions : transactions.filter((item) => bankCode(item) === bankFilter);
-    if (period !== "all" && latestDate) {
-      const cutoff = new Date(`${latestDate.slice(0, 10)}T00:00:00`);
-      cutoff.setDate(cutoff.getDate() - Number(period) + 1);
-      result = result.filter((item) => new Date(`${item.date.slice(0, 10)}T00:00:00`) >= cutoff);
-    }
-    return result;
-  }, [bankFilter, latestDate, period, transactions]);
+  const byBank = useMemo(() => (bankFilter === ALL ? transactions : transactions.filter((t) => bankCode(t) === bankFilter)), [bankFilter, transactions]);
 
-  const categoryData = useMemo(() => aggregate(dashboardTransactions, (item) => item.category), [dashboardTransactions]);
-  const bankData = useMemo(() => aggregate(dashboardTransactions, bankCode), [dashboardTransactions]);
-  const trendData = useMemo(() => aggregate(dashboardTransactions, (item) => item.date).sort((a, b) => a.name.localeCompare(b.name)).map((item) => ({ ...item, label: formatDate(item.name, true) })), [dashboardTransactions]);
-  const total = dashboardTransactions.reduce((sum, item) => sum + amountOf(item), 0);
-  const average = dashboardTransactions.length ? total / dashboardTransactions.length : 0;
-  const highest = dashboardTransactions.reduce((max, item) => Math.max(max, amountOf(item)), 0);
+  // Current window ends on the latest transaction date; the previous window is the same length right before it.
+  const range = useMemo(() => {
+    const times = byBank.map((t) => dayStart(t.date));
+    if (!times.length) return null;
+    const end = Math.max(...times);
+    const first = Math.min(...times);
+    const days = period === "all" ? Math.round((end - first) / DAY) + 1 : Number(period);
+    const start = end - (days - 1) * DAY;
+    return { start, end, days, prevStart: start - days * DAY, prevEnd: start - DAY, compare: period !== "all" };
+  }, [byBank, period]);
 
-  const historyTransactions = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    return transactions.filter((item) => {
-      const categoryMatches = categoryFilter === "ทั้งหมด" || item.category === categoryFilter;
-      const searchMatches = !query || [item.memo, item.recipient, item.bank_name, item.reference ?? ""].some((value) => value.toLowerCase().includes(query));
-      return categoryMatches && searchMatches;
+  const inWindow = useCallback((t: Transaction, from: number, to: number) => {
+    const d = dayStart(t.date);
+    return d >= from && d <= to;
+  }, []);
+
+  const current = useMemo(() => (range ? byBank.filter((t) => inWindow(t, range.start, range.end)).sort((a, b) => b.date.localeCompare(a.date)) : []), [byBank, inWindow, range]);
+  const previous = useMemo(() => (range?.compare ? byBank.filter((t) => inWindow(t, range.prevStart, range.prevEnd)) : []), [byBank, inWindow, range]);
+
+  const total = current.reduce((s, t) => s + amountOf(t), 0);
+  const prevTotal = range?.compare ? previous.reduce((s, t) => s + amountOf(t), 0) : null;
+  const categories = useMemo(() => sumBy(current, (t) => t.category), [current]);
+  const prevCategories = useMemo(() => new Map(sumBy(previous, (t) => t.category).map((c) => [c.name, c.value])), [previous]);
+  const bankTotals = useMemo(() => sumBy(current, bankCode), [current]);
+  const prevBankTotals = useMemo(() => new Map(sumBy(previous, bankCode).map((b) => [b.name, b.value])), [previous]);
+
+  const topCategory = categories[0];
+  const topBank = bankTotals[0];
+  const stack = useMemo(() => {
+    const top = categories.slice(0, 3).map((c) => ({ name: c.name, value: c.value }));
+    const rest = categories.slice(3).reduce((s, c) => s + c.value, 0);
+    if (rest > 0) top.push({ name: "หมวดอื่น", value: rest });
+    return top;
+  }, [categories]);
+
+  // Daily series for each metric card: current window vs. previous window, aligned by day.
+  const series = useMemo(() => {
+    if (!range) return [];
+    return CHART_METRICS.map((metric) => {
+      const pick = (t: Transaction) => !metric.category || t.category === metric.category;
+      const daily = (items: Transaction[], from: number) => {
+        const values = new Array<number>(range.days).fill(0);
+        items.filter(pick).forEach((t) => {
+          const i = Math.round((dayStart(t.date) - from) / DAY);
+          if (i >= 0 && i < range.days) values[i] += metric.kind === "money" ? amountOf(t) : 1;
+        });
+        return values;
+      };
+      const cur = daily(current, range.start);
+      const prev = range.compare ? daily(previous, range.prevStart) : null;
+      const value = cur.reduce((s, v) => s + v, 0);
+      const prevValue = prev ? prev.reduce((s, v) => s + v, 0) : null;
+      const data = cur.map((v, i) => ({ label: thaiDate(range.start + i * DAY), value: v, previous: prev ? prev[i] : undefined }));
+      return { ...metric, value, prevValue, change: change(value, prevValue), data };
     });
-  }, [categoryFilter, searchQuery, transactions]);
+  }, [current, previous, range]);
+
+  const history = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return transactions
+      .filter((t) => (categoryFilter === ALL || t.category === categoryFilter) && (!q || [t.memo, t.recipient, t.bank_name, t.reference ?? ""].some((v) => v.toLowerCase().includes(q))))
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [categoryFilter, query, transactions]);
 
   const handleFiles = useCallback((selected: File[]) => {
-    const valid = selected.filter((file) => file.type.startsWith("image/"));
-    previews.forEach((preview) => URL.revokeObjectURL(preview.url));
+    const valid = selected.filter((f) => f.type.startsWith("image/"));
+    previews.forEach((p) => URL.revokeObjectURL(p.url));
     setFiles(valid);
-    setPreviews(valid.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })));
+    setPreviews(valid.map((f) => ({ name: f.name, url: URL.createObjectURL(f) })));
     if (valid.length !== selected.length) setToast("ข้ามไฟล์ที่ไม่ใช่รูปภาพแล้ว");
   }, [previews]);
 
@@ -251,7 +347,7 @@ export default function Home() {
         const response = await fetch(`${API_URL}/analyze-slip/`, { method: "POST", body: form, headers: { "ngrok-skip-browser-warning": "true" } });
         const payload = await response.json();
         if (!response.ok || payload.status !== "success") throw new Error(payload.detail ?? "วิเคราะห์ไม่สำเร็จ");
-        items.push({ id: Date.now() + index, preview: previews[index]?.url ?? "", date: new Date().toISOString().slice(0, 10), ...payload.data, is_sample: false });
+        items.push({ id: Date.now() + index, preview: previews[index]?.url ?? "", date: isoDay(Date.now()), ...payload.data, is_sample: false });
       } catch (error) {
         errors.push(DEMO_MODE ? "ระบบหลังบ้านยังไม่พร้อมใช้งาน โปรดติดต่อผู้พัฒนา" : `${file.name}: ${error instanceof Error ? error.message : "เชื่อมต่อ API ไม่ได้"}`);
       }
@@ -260,7 +356,7 @@ export default function Home() {
       addTransactions(items);
       setFiles([]);
       setPreviews([]);
-      setActiveMenu("dashboard");
+      setMenu("dashboard");
     }
     if (errors.length) setToast(errors[0]);
     setLoading(false);
@@ -268,8 +364,8 @@ export default function Home() {
 
   const restoreSamples = () => {
     persist(SAMPLE_TRANSACTIONS);
-    setPeriod("all");
-    setBankFilter("ทั้งหมด");
+    setPeriod("30");
+    setBankFilter(ALL);
     setToast("คืนข้อมูลตัวอย่าง 100 รายการแล้ว");
   };
 
@@ -278,107 +374,288 @@ export default function Home() {
     persist([]);
   };
 
-  const topCategory = categoryData[0];
-  const topBank = bankData[0];
+  const navItem = (active: boolean) =>
+    cx(active ? "text-emerald-700" : "text-gray-700 hover:text-gray-900", "flex w-full items-center gap-x-2.5 rounded-md px-2 py-1.5 text-left text-sm font-medium transition hover:bg-gray-100", focusRing);
+
+  const shortcuts = [
+    { label: "คืนข้อมูลตัวอย่าง", icon: RiRefreshLine, onClick: restoreSamples },
+    { label: "ดาวน์โหลด CSV", icon: RiDownload2Line, href: "/data/slip-transactions.csv", download: true },
+    { label: "ซอร์สโค้ดบน GitHub", icon: RiGithubLine, href: REPO_URL },
+    { label: "ล้างข้อมูล", icon: RiDeleteBin6Line, onClick: clearData, danger: true },
+  ];
+
+  const windowLabel = range ? `${thaiDate(range.start)} – ${thaiDate(range.end)}` : "—";
+  const compareLabel = range?.compare ? `${thaiDate(range.prevStart)} – ${thaiDate(range.prevEnd)}` : null;
 
   return (
-    <div className="min-h-screen overflow-x-clip bg-[#f3f6f4] text-slate-900">
+    <div className="min-h-screen bg-white text-gray-900">
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-[#073f31] px-5 py-6 text-white lg:flex">
-        <div className="mb-10 flex items-center gap-3 px-2">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-400 text-2xl">♡</div>
-          <div><p className="text-xl font-bold">ใส่ใจ</p><p className="text-xs tracking-normal text-emerald-300">expense intelligence</p></div>
+
+      {/* sidebar (lg+) */}
+      <nav className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col" aria-label="เมนูหลัก">
+        <aside className="flex grow flex-col gap-y-6 overflow-y-auto border-r border-gray-200 bg-white p-4">
+          <div className="flex w-full items-center gap-x-2.5 rounded-md border border-gray-300 bg-white p-2 text-sm shadow-sm">
+            <span className="flex aspect-square size-8 shrink-0 items-center justify-center overflow-hidden rounded bg-white p-0.5 ring-1 ring-gray-200">
+              <Image src="/image_74b13d.png" alt="" width={64} height={35} className="h-auto w-full" priority />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate font-semibold text-gray-900">SaiJai Analytics</span>
+              <span className="block truncate text-xs text-gray-700">ข้อมูลตัวอย่าง · เดโม</span>
+            </span>
+          </div>
+
+          <div className="flex flex-1 flex-col space-y-10">
+            <ul role="list" className="space-y-0.5">
+              {NAVIGATION.map((item) => (
+                <li key={item.id}>
+                  <button onClick={() => setMenu(item.id)} aria-current={menu === item.id ? "page" : undefined} className={navItem(menu === item.id)}>
+                    <item.icon className="size-4 shrink-0" aria-hidden />
+                    {item.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div>
+              <span className="text-xs font-medium leading-6 text-gray-500">ทางลัด</span>
+              <ul role="list" className="space-y-0.5">
+                {shortcuts.map((s) => {
+                  const cls = cx(s.danger ? "text-red-600 hover:text-red-700" : "text-gray-700 hover:text-gray-900", "flex w-full items-center gap-x-2.5 rounded-md px-2 py-1.5 text-left text-sm font-medium transition hover:bg-gray-100", focusRing);
+                  const body = <><s.icon className="size-4 shrink-0" aria-hidden />{s.label}</>;
+                  return <li key={s.label}>{s.href ? <a href={s.href} download={s.download || undefined} className={cls}>{body}</a> : <button onClick={s.onClick} className={cls}>{body}</button>}</li>;
+                })}
+              </ul>
+            </div>
+          </div>
+
+          <a href={DEVELOPER_CONTACT} className={cx("mt-auto flex items-center gap-x-2.5 rounded-md p-2 text-sm font-medium text-gray-900 hover:bg-gray-100", focusRing)}>
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700"><RiMailLine className="size-4" aria-hidden /></span>
+            <span><span className="block">ติดต่อผู้พัฒนา</span><span className="block text-xs font-normal text-gray-500">สอบถามหรือขอทดลองระบบจริง</span></span>
+          </a>
+        </aside>
+      </nav>
+
+      {/* top bar (below lg) */}
+      <div className="sticky top-0 z-40 border-b border-gray-200 bg-white shadow-sm lg:hidden">
+        <div className="flex h-14 items-center justify-between px-4">
+          <div className="flex items-center gap-2.5">
+            <Image src="/image_74b13d.png" alt="" width={52} height={28} className="h-7 w-auto" priority />
+            <span className="text-sm font-semibold">SaiJai Analytics</span>
+          </div>
+          <a href={DEVELOPER_CONTACT} className="text-sm font-medium text-emerald-700">ติดต่อผู้พัฒนา</a>
         </div>
-        <nav className="space-y-2">
-          {NAV_ITEMS.map((item) => <button key={item.id} onClick={() => setActiveMenu(item.id)} className={`flex w-full items-center gap-4 rounded-2xl px-4 py-3.5 text-left text-sm font-bold transition ${activeMenu === item.id ? "bg-emerald-400 text-emerald-950 shadow-lg shadow-emerald-950/30" : "text-emerald-100/70 hover:bg-white/5 hover:text-white"}`}><span className="text-xl">{item.icon}</span>{item.label}</button>)}
-        </nav>
-        <div className="mt-auto rounded-3xl border border-white/10 bg-black/15 p-5">
-          <p className="text-xs font-bold tracking-normal text-emerald-300">ข้อมูลในระบบ</p>
-          <p className="mt-2 text-3xl font-bold">{transactions.length}</p>
-          <p className="text-xs text-emerald-100/60">รายการจาก {banks.length} ธนาคาร</p>
-          <a href="/data/slip-transactions.csv" download className="mt-4 block rounded-xl bg-white/10 px-3 py-2 text-center text-xs font-bold hover:bg-white/15">ดาวน์โหลด CSV</a>
+        <div className="-mb-px flex gap-5 overflow-x-auto px-4 text-sm">
+          {NAVIGATION.map((item) => (
+            <button key={item.id} onClick={() => setMenu(item.id)} className={cx("whitespace-nowrap border-b-2 pb-2.5 pt-1 font-medium", menu === item.id ? "border-emerald-600 text-emerald-700" : "border-transparent text-gray-600")}>{item.label}</button>
+          ))}
         </div>
-      </aside>
+      </div>
 
-      <main className="pb-24 lg:ml-64 lg:pb-0">
-        <DemoNotice />
-        <header className="sticky top-0 z-20 flex min-h-20 flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 bg-[#f3f6f4]/90 px-5 py-4 backdrop-blur-xl sm:px-8">
-          <div><p className="text-xs font-bold tracking-normal text-emerald-600">SaiJai Analytics</p><h1 className="text-xl font-bold sm:text-2xl">{NAV_ITEMS.find((item) => item.id === activeMenu)?.label}</h1></div>
-          <div className="flex flex-wrap gap-2"><button onClick={restoreSamples} className="rounded-xl border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50">คืนข้อมูลตัวอย่าง</button><button onClick={clearData} className="rounded-xl border border-rose-100 bg-white px-3 py-2 text-xs font-bold text-rose-500 hover:bg-rose-50">ล้างข้อมูล</button></div>
-        </header>
-
-        <div className="mx-auto max-w-7xl p-5 sm:p-8">
-          {activeMenu === "dashboard" && (
-            <div className="space-y-6">
-              <section className="overflow-hidden rounded-[2rem] bg-[#073f31] p-6 text-white shadow-xl sm:p-8">
-                <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
-                  <div>
-                    <div className="mb-4 inline-flex rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-bold tracking-normal text-emerald-300">Synthetic dataset · ไม่ใช่ธุรกรรมจริง</div>
-                    <h2 className="max-w-2xl text-3xl font-bold leading-tight sm:text-4xl">เข้าใจพฤติกรรมการใช้จ่าย<br />จากสลิปในที่เดียว</h2>
-                    <p className="mt-3 max-w-xl text-sm leading-6 text-emerald-100/65">วิเคราะห์ข้อมูลตัวอย่าง 100 รายการ ครอบคลุม 5 ธนาคาร พร้อมตัวกรองและสรุปเชิงลึกแบบอัตโนมัติ</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <select value={bankFilter} onChange={(event) => setBankFilter(event.target.value)} className="rounded-xl border border-white/10 bg-white/10 px-4 py-2.5 text-sm font-bold outline-none"><option className="text-slate-900">ทั้งหมด</option>{banks.map((bank) => <option key={bank} className="text-slate-900">{bank}</option>)}</select>
-                    <div className="flex rounded-xl bg-white/10 p-1">{(["30", "90", "all"] as Period[]).map((value) => <button key={value} onClick={() => setPeriod(value)} className={`rounded-lg px-3 py-2 text-xs font-bold ${period === value ? "bg-emerald-400 text-emerald-950" : "text-white/65"}`}>{value === "all" ? "ทั้งหมด" : `${value} วัน`}</button>)}</div>
-                  </div>
-                </div>
-              </section>
-
-              <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                {[["ยอดใช้จ่ายรวม", `฿${formatMoney(total)}`, `${dashboardTransactions.length} รายการ`], ["ค่าเฉลี่ยต่อสลิป", `฿${formatMoney(average)}`, "ต่อหนึ่งธุรกรรม"], ["รายการสูงสุด", `฿${formatMoney(highest)}`, topCategory?.name ?? "ยังไม่มีข้อมูล"], ["ธนาคารหลัก", topBank?.name ?? "–", topBank ? `${topBank.count} รายการ` : "ยังไม่มีข้อมูล"]].map(([label, value, note]) => <article key={label} className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm"><p className="text-xs font-bold tracking-normal text-slate-400">{label}</p><p className="mt-3 text-2xl font-bold text-slate-900">{value}</p><p className="mt-1 text-xs font-semibold text-slate-400">{note}</p></article>)}
-              </section>
-
-              <section className="grid gap-6 xl:grid-cols-12">
-                <article className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-sm xl:col-span-8">
-                  <div className="mb-6"><p className="text-lg font-bold">แนวโน้มยอดใช้จ่าย</p><p className="text-xs text-slate-400">ยอดรวมรายวันตามช่วงที่เลือก</p></div>
-                  <div className="h-72"><ResponsiveContainer width="100%" height="100%"><LineChart data={trendData} margin={{ left: 0, right: 10 }}><CartesianGrid vertical={false} stroke="#eef2f7" /><XAxis dataKey="label" minTickGap={35} tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} /><YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} /><Tooltip formatter={(value) => [`฿${formatMoney(Number(value), 2)}`, "ยอดใช้จ่าย"]} labelStyle={{ fontWeight: 800 }} contentStyle={{ border: 0, borderRadius: 16, boxShadow: "0 12px 30px rgb(15 23 42 / .12)" }} /><Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 5 }} /></LineChart></ResponsiveContainer></div>
-                </article>
-                <article className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-sm xl:col-span-4">
-                  <p className="text-lg font-bold">สัดส่วนหมวดหมู่</p><p className="text-xs text-slate-400">คำนวณจากยอดเงินรวม</p>
-                  <div className="h-72"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={categoryData} dataKey="value" nameKey="name" innerRadius="52%" outerRadius="76%" paddingAngle={3} stroke="none">{categoryData.map((entry) => <Cell key={entry.name} fill={CATEGORY_COLORS[entry.name] ?? "#64748b"} />)}</Pie><Tooltip formatter={(value) => [`฿${formatMoney(Number(value), 2)}`, "ยอดใช้จ่าย"]} contentStyle={{ border: 0, borderRadius: 16 }} /><Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} /></PieChart></ResponsiveContainer></div>
-                </article>
-              </section>
-
-              <section className="grid gap-6 xl:grid-cols-12">
-                <article className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-sm xl:col-span-7">
-                  <p className="text-lg font-bold">ยอดใช้จ่ายแยกธนาคาร</p><p className="mb-5 text-xs text-slate-400">เปรียบเทียบยอดรวมจากสลิปแต่ละธนาคาร</p>
-                  <div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={bankData}><CartesianGrid vertical={false} stroke="#eef2f7" /><XAxis dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} /><YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} /><Tooltip formatter={(value) => [`฿${formatMoney(Number(value), 2)}`, "ยอดใช้จ่าย"]} contentStyle={{ border: 0, borderRadius: 16 }} /><Bar dataKey="value" radius={[8, 8, 0, 0]}>{bankData.map((entry) => <Cell key={entry.name} fill={BANK_COLORS[entry.name] ?? "#64748b"} />)}</Bar></BarChart></ResponsiveContainer></div>
-                </article>
-                <article className="rounded-[2rem] bg-emerald-50 p-6 xl:col-span-5">
-                  <p className="text-xs font-bold tracking-normal text-emerald-700">Automatic insight</p><h3 className="mt-3 text-2xl font-bold text-emerald-950">สรุปสิ่งที่พบ</h3>
-                  <div className="mt-5 space-y-3 text-sm leading-6 text-emerald-950/70"><p className="rounded-2xl bg-white/70 p-4">หมวด <strong>{topCategory?.name ?? "–"}</strong> มียอดสูงสุด ฿{formatMoney(topCategory?.value ?? 0)} คิดเป็น {total ? (((topCategory?.value ?? 0) / total) * 100).toFixed(1) : "0"}% ของยอดรวม</p><p className="rounded-2xl bg-white/70 p-4"><strong>{topBank?.name ?? "–"}</strong> เป็นธนาคารที่มียอดรวมสูงสุดจาก {topBank?.count ?? 0} รายการ</p><p className="rounded-2xl bg-white/70 p-4">ยอดเฉลี่ยต่อรายการอยู่ที่ <strong>฿{formatMoney(average)}</strong> และรายการสูงสุดอยู่ที่ ฿{formatMoney(highest)}</p></div>
-                </article>
-              </section>
-
-              <section>
-                <div className="mb-4 flex items-end justify-between"><div><h3 className="text-lg font-bold">รายการล่าสุด</h3><p className="text-xs text-slate-400">อัปเดตจากข้อมูลในเบราว์เซอร์</p></div><button onClick={() => setActiveMenu("history")} className="text-xs font-bold text-emerald-700">ดูทั้งหมด →</button></div>
-                <div className="grid gap-3 lg:grid-cols-2">{dashboardTransactions.slice(0, 6).map((transaction) => <TransactionRow key={transaction.id} transaction={transaction} />)}</div>{!dashboardTransactions.length && <EmptyState>ไม่พบข้อมูลในช่วงที่เลือก</EmptyState>}
-              </section>
+      <main className="lg:pl-72">
+        <div className="mx-auto max-w-screen-2xl p-4 sm:px-6 sm:pb-10 sm:pt-8 lg:px-10 lg:pt-7">
+          {DEMO_MODE && (
+            <div className="mb-8">
+              <Callout>
+                <span className="font-semibold">เว็บไซต์นี้เป็นเว็บจำลองสำหรับสาธิตเท่านั้น</span> ระบบหลังบ้านสำหรับวิเคราะห์สลิปยังไม่พร้อมใช้งาน ข้อมูลทั้งหมดเป็นข้อมูลตัวอย่างที่สร้างขึ้น ไม่ใช่ธุรกรรมจริง หากต้องการทดลองระบบจริง{" "}
+                <a href={DEVELOPER_CONTACT} className="font-semibold underline underline-offset-2">โปรดติดต่อผู้พัฒนา</a>
+              </Callout>
             </div>
           )}
 
-          {activeMenu === "upload" && (
-            <section className="mx-auto max-w-2xl py-8"><div className="rounded-[2.5rem] border border-slate-100 bg-white p-7 shadow-xl sm:p-10">
-              <div className="mb-8 text-center"><div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-100 text-4xl text-emerald-700">↑</div><h2 className="text-3xl font-bold">เพิ่มสลิปใหม่</h2><p className="mt-2 text-sm text-slate-400">ระบบจะใช้ OCR และ AI เพื่อจัดหมวดหมู่อัตโนมัติ</p></div>
-              {DEMO_MODE && <div className="mb-6"><DemoNotice compact /></div>}
-              <button type="button" onClick={() => fileInput.current?.click()} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={(event) => { event.preventDefault(); setDragging(false); handleFiles([...event.dataTransfer.files]); }} className={`w-full rounded-3xl border-2 border-dashed p-12 text-center transition ${dragging ? "border-emerald-500 bg-emerald-50" : "border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/40"}`}><input ref={fileInput} type="file" multiple accept="image/*" className="hidden" onChange={(event) => handleFiles([...(event.target.files ?? [])])} /><p className="text-4xl">▧</p><p className="mt-3 font-bold text-slate-700">คลิกหรือลากไฟล์มาวาง</p><p className="mt-1 text-xs text-slate-400">JPG, PNG, WebP ขนาดไม่เกิน 10 MB</p></button>
-              {!!previews.length && <div className="mt-5 grid grid-cols-3 gap-3">{previews.map((preview) => <div key={preview.url} className="overflow-hidden rounded-2xl bg-slate-100">
-                {/* User-selected object URLs cannot be optimized by next/image. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={preview.url} alt={preview.name} className="aspect-square w-full object-cover" />
-                <p className="truncate p-2 text-xs font-bold">{preview.name}</p>
-              </div>)}</div>}
-              {!!files.length && <button onClick={handleUpload} disabled={loading} className="mt-6 w-full rounded-2xl bg-[#073f31] py-4 font-bold text-white shadow-lg disabled:bg-slate-300">{loading ? "กำลังวิเคราะห์..." : `วิเคราะห์ ${files.length} สลิป`}</button>}
-            </div></section>
+          {menu === "dashboard" && (
+            <>
+              <section aria-labelledby="summary">
+                <SectionTitle id="summary">สรุปช่วงที่เลือก</SectionTitle>
+                <p className="mt-1 text-sm text-gray-500">{windowLabel}{compareLabel ? ` · เทียบกับ ${compareLabel}` : ""}</p>
+                <dl className="mt-6 grid grid-cols-1 gap-14 sm:mt-8 sm:grid-cols-2 xl:grid-cols-3">
+                  {/* categories */}
+                  <div className="flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <dt className="font-bold text-gray-900 sm:text-sm">หมวดค่าใช้จ่าย</dt>
+                        {topCategory && <ChangeBadge value={change(topCategory.value, prevCategories.has(topCategory.name) ? prevCategories.get(topCategory.name)! : range?.compare ? 0 : null)} />}
+                      </div>
+                      <dd className="mt-2 flex items-baseline gap-2">
+                        <span className="text-xl text-gray-900">{topCategory && total ? percent(topCategory.value / total) : "—"}</span>
+                        <span className="text-sm text-gray-500">{topCategory ? `ของยอดรวมเป็น${topCategory.name}` : "ยังไม่มีข้อมูล"}</span>
+                      </dd>
+                      <ul role="list" className="mt-4 space-y-5">
+                        {categories.slice(0, 3).map((c) => (
+                          <li key={c.name}>
+                            <p className="flex justify-between text-sm"><span className="font-medium text-gray-900">{c.name}</span><span className="font-medium text-gray-900">{baht(c.value)}<span className="font-normal text-gray-500"> / {baht(total)}</span></span></p>
+                            <ProgressBar value={c.value} max={total} />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <p className="mt-6 text-xs text-gray-500">ดูรายการแยกตามหมวดได้ใน <button onClick={() => setMenu("history")} className="text-emerald-700 hover:underline">หน้ารายการ</button></p>
+                  </div>
+
+                  {/* banks */}
+                  <div className="flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <dt className="font-bold text-gray-900 sm:text-sm">ธนาคาร</dt>
+                        {topBank && <ChangeBadge value={change(topBank.value, prevBankTotals.has(topBank.name) ? prevBankTotals.get(topBank.name)! : range?.compare ? 0 : null)} />}
+                      </div>
+                      <dd className="mt-2 flex items-baseline gap-2">
+                        <span className="text-xl text-gray-900">{topBank ? BANK_NAMES[topBank.name] ?? topBank.name : "—"}</span>
+                        <span className="text-sm text-gray-500">{topBank ? `ยอดสูงสุด ${topBank.count} รายการ` : ""}</span>
+                      </dd>
+                      <ul role="list" className="mt-4 space-y-5">
+                        {bankTotals.slice(0, 3).map((b) => (
+                          <li key={b.name}>
+                            <p className="flex justify-between text-sm"><span className="font-medium text-gray-900">{BANK_NAMES[b.name] ?? b.name}</span><span className="font-medium text-gray-900">{baht(b.value)}<span className="font-normal text-gray-500"> · {b.count} รายการ</span></span></p>
+                            <ProgressBar value={b.value} max={total} color="bg-gray-500" track="bg-gray-200" />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <p className="mt-6 text-xs text-gray-500">ข้อมูลครอบคลุม {banks.length} ธนาคาร</p>
+                  </div>
+
+                  {/* total with stacked bar */}
+                  <div className="flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-gray-900 sm:text-sm">ยอดใช้จ่าย</h3>
+                        <ChangeBadge value={change(total, prevTotal)} />
+                      </div>
+                      <p className="mt-2 flex items-baseline gap-2">
+                        <span className="text-xl text-gray-900">{baht(total)}</span>
+                        <span className="text-sm text-gray-500">{current.length} รายการในช่วงที่เลือก</span>
+                      </p>
+                      <div className="mt-4">
+                        <p className="text-sm font-medium text-gray-900">สัดส่วนตามหมวด</p>
+                        <div className="mt-2 flex items-center gap-0.5">
+                          {stack.map((s, i) => <div key={s.name} className={cx(STACK_COLORS[i], "h-1.5 rounded-full")} style={{ width: `${total ? (s.value / total) * 100 : 0}%` }} />)}
+                        </div>
+                      </div>
+                      <ul role="list" className="mt-5 space-y-2">
+                        {stack.map((s, i) => (
+                          <li key={s.name} className="flex items-center gap-2 text-xs">
+                            <span className={cx(STACK_COLORS[i], "size-2.5 rounded-sm")} aria-hidden />
+                            <span className="text-gray-900">{s.name}</span>
+                            <span className="text-gray-600">({baht(s.value)} / {total ? percent(s.value / total) : "0%"})</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <p className="mt-6 text-xs text-gray-500">{prevTotal !== null ? `ช่วงก่อนหน้าใช้ไป ${baht(prevTotal)}` : "เลือกช่วง 7, 30 หรือ 45 วันเพื่อเทียบกับช่วงก่อนหน้า"}</p>
+                  </div>
+                </dl>
+              </section>
+
+              <section aria-labelledby="daily">
+                <SectionTitle id="daily" className="mt-16">รายวัน</SectionTitle>
+                <div className="sticky top-[5.75rem] z-20 flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white pb-4 pt-4 sm:pt-6 lg:top-0 lg:pt-8">
+                  <div className="flex overflow-hidden rounded-md border border-gray-300 shadow-sm">
+                    {PERIODS.map((p) => (
+                      <button key={p.id} onClick={() => setPeriod(p.id)} className={cx("px-3 py-1.5 text-sm font-medium [&:not(:first-child)]:border-l [&:not(:first-child)]:border-gray-300", period === p.id ? "bg-gray-100 text-gray-900" : "bg-white text-gray-600 hover:bg-gray-50", focusRing)}>{p.label}</button>
+                    ))}
+                  </div>
+                  <select aria-label="ธนาคาร" value={bankFilter} onChange={(e) => setBankFilter(e.target.value)} className={inputClass}>
+                    <option value={ALL}>ทุกธนาคาร</option>
+                    {banks.map((b) => <option key={b} value={b}>{BANK_NAMES[b] ?? b}</option>)}
+                  </select>
+                  <span className="text-sm text-gray-500">{compareLabel ? <>เทียบกับ <span className="font-medium text-gray-700">ช่วงก่อนหน้า</span></> : "ไม่เทียบช่วงก่อนหน้า"}</span>
+                </div>
+                <dl className="mt-10 grid grid-cols-1 gap-14 md:grid-cols-2 xl:grid-cols-3">
+                  {series.map((m) => {
+                    const fmt = m.kind === "money" ? (v: number) => baht(v) : count;
+                    return (
+                      <div key={m.title}>
+                        <div className="flex items-center gap-x-2">
+                          <dt className="font-bold text-gray-900 sm:text-sm">{m.title}</dt>
+                          <ChangeBadge value={m.change} />
+                        </div>
+                        <div className="mt-2 flex items-baseline justify-between">
+                          <dd className="text-xl text-gray-900">{fmt(m.value)}</dd>
+                          {m.prevValue !== null && <dd className="text-sm text-gray-500">จาก {fmt(m.prevValue)}</dd>}
+                        </div>
+                        <div className="mt-6 h-32">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={m.data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+                              <CartesianGrid vertical={false} stroke="#e5e7eb" strokeDasharray="0" />
+                              <XAxis dataKey="label" ticks={m.data.length ? [m.data[0].label, m.data[m.data.length - 1].label] : []} interval="preserveStartEnd" tick={{ fontSize: 12, fill: "#6b7280" }} axisLine={false} tickLine={false} />
+                              <YAxis hide domain={["auto", "auto"]} />
+                              <Tooltip formatter={(v, name) => [fmt(Number(v)), name === "previous" ? "ช่วงก่อนหน้า" : "ช่วงนี้"]} contentStyle={{ borderRadius: 6, border: "1px solid #e5e7eb", boxShadow: "0 1px 2px rgb(0 0 0 / .05)", fontSize: 13 }} />
+                              {range?.compare && <Line dataKey="previous" stroke="#9ca3af" strokeWidth={2} dot={false} isAnimationActive={false} />}
+                              <Line dataKey="value" stroke="#059669" strokeWidth={2} dot={false} isAnimationActive={false} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </dl>
+              </section>
+
+              <section aria-labelledby="latest">
+                <div className="mt-16 flex items-baseline justify-between">
+                  <SectionTitle id="latest">รายการล่าสุด</SectionTitle>
+                  <button onClick={() => setMenu("history")} className="text-sm font-medium text-emerald-700 hover:underline">ดูทั้งหมด</button>
+                </div>
+                <div className="mt-4">{current.length ? <TransactionTable rows={current.slice(0, 8)} /> : <p className="py-10 text-center text-sm text-gray-500">ไม่มีรายการในช่วงที่เลือก</p>}</div>
+              </section>
+            </>
           )}
 
-          {activeMenu === "history" && (
-            <section className="space-y-5"><div className="rounded-3xl bg-white p-5 shadow-sm"><div className="flex flex-col gap-3 sm:flex-row"><input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="ค้นหาผู้รับ รายการ ธนาคาร หรือเลขอ้างอิง..." className="min-w-0 flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-500" /><select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none"><option>ทั้งหมด</option>{CATEGORIES.map((category) => <option key={category}>{category}</option>)}</select></div><p className="mt-3 text-xs font-semibold text-slate-400">แสดง {historyTransactions.length} จาก {transactions.length} รายการ</p></div><div className="grid gap-3 lg:grid-cols-2">{historyTransactions.map((transaction) => <TransactionRow key={transaction.id} transaction={transaction} />)}</div>{!historyTransactions.length && <EmptyState>ไม่พบรายการที่ตรงกับเงื่อนไข</EmptyState>}</section>
+          {menu === "history" && (
+            <section aria-labelledby="history">
+              <SectionTitle id="history">รายการ</SectionTitle>
+              <p className="mt-1 text-sm text-gray-500">แสดง {count(history.length)} จาก {count(transactions.length)} รายการ</p>
+              <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                <div className="relative min-w-0 flex-1 sm:max-w-sm">
+                  <RiSearchLine className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-gray-400" aria-hidden />
+                  <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="ค้นหารายการ ผู้รับ ธนาคาร หรือเลขอ้างอิง" className={cx(inputClass, "w-full pl-8")} />
+                </div>
+                <select aria-label="หมวด" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={inputClass}>
+                  <option value={ALL}>ทุกหมวด</option>
+                  {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="mt-4">{history.length ? <TransactionTable rows={history} showConfidence /> : <p className="py-10 text-center text-sm text-gray-500">ไม่พบรายการที่ตรงกับเงื่อนไข</p>}</div>
+            </section>
+          )}
+
+          {menu === "upload" && (
+            <section aria-labelledby="upload" className="max-w-2xl">
+              <SectionTitle id="upload">เพิ่มสลิป</SectionTitle>
+              <p className="mt-1 text-sm text-gray-500">ระบบอ่านข้อความจากสลิปด้วย OCR แล้วจัดหมวดค่าใช้จ่ายให้อัตโนมัติ</p>
+              <button
+                type="button"
+                onClick={() => fileInput.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(e) => { e.preventDefault(); setDragging(false); handleFiles([...e.dataTransfer.files]); }}
+                className={cx("mt-6 flex w-full flex-col items-center rounded-md border border-dashed px-6 py-12 text-center transition", dragging ? "border-emerald-500 bg-emerald-50" : "border-gray-300 hover:border-gray-400", focusRing)}
+              >
+                <input ref={fileInput} type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleFiles([...(e.target.files ?? [])])} />
+                <RiUploadCloud2Line className="size-8 text-gray-400" aria-hidden />
+                <p className="mt-3 text-sm font-medium text-gray-900">คลิกเพื่อเลือกไฟล์ <span className="font-normal text-gray-500">หรือลากสลิปมาวาง</span></p>
+                <p className="mt-1 text-xs text-gray-500">JPG, PNG หรือ WebP ไม่เกิน 10 MB ต่อไฟล์</p>
+              </button>
+              {!!previews.length && (
+                <ul className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-4">
+                  {previews.map((p) => (
+                    <li key={p.url} className="overflow-hidden rounded-md border border-gray-200">
+                      {/* User-selected object URLs cannot be optimized by next/image. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={p.url} alt={p.name} className="aspect-square w-full object-cover" />
+                      <p className="truncate px-2 py-1 text-xs text-gray-600">{p.name}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {!!files.length && (
+                <button onClick={handleUpload} disabled={loading} className={cx("mt-4 w-full rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:bg-gray-300", focusRing)}>
+                  {loading ? "กำลังวิเคราะห์…" : `วิเคราะห์ ${files.length} สลิป`}
+                </button>
+              )}
+            </section>
           )}
         </div>
       </main>
-
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t border-slate-200 bg-white/95 backdrop-blur lg:hidden">{NAV_ITEMS.map((item) => <button key={item.id} onClick={() => setActiveMenu(item.id)} className={`flex flex-col items-center gap-1 py-3 text-xs font-bold ${activeMenu === item.id ? "text-emerald-700" : "text-slate-400"}`}><span className="text-lg">{item.icon}</span>{item.label}</button>)}</nav>
     </div>
   );
 }
